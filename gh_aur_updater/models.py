@@ -33,9 +33,9 @@ class BuildConfiguration:
     commit_message_prefix: str
     debug_mode: bool
     dry_run_mode: bool              # If True, no actual changes (git push, releases) are made
-    secret_ghuk_value: Optional[str] = None # For nvchecker keyfile.toml
 
     pkgbuild_search_root: Path      # NEW: The root directory for PKGBUILD searches
+    secret_ghuk_value: Optional[str] = None # For nvchecker keyfile.toml
     pkgbuild_search_patterns: List[str] = field(default_factory=lambda: ["**/PKGBUILD"])
 
 # --- Package Information Models ---
