@@ -48,7 +48,7 @@ test = [
 ]
 # Dependencies for development (e.g., linters, formatters)
 dev = [
-    "arch-package-updater[test]", # Includes test dependencies
+    "gh-aur-updater[test]", # Includes test dependencies
     "black",                # Code formatter
     "ruff",                 # Linter
     "mypy",                 # Static type checker
