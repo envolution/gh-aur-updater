@@ -4,7 +4,7 @@ config.py - Loads and provides the BuildConfiguration.
 import os
 import re # For PkgVersion model parsing
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from .models import BuildConfiguration # Assuming models.py is in the same directory
 
