@@ -49,41 +49,36 @@ class NvCheckerClient:
             logger.error(f"Failed to write aur.json to {output_path}: {e}", exc_info=True)
             raise ArchPackageUpdaterError(f"IOError writing aur.json: {e}") from e
         return output_path
-
     def prepare_global_nvchecker_config(
         self,
-        workspace_packages: List[PKGBUILDData],
-        aur_json_path: Path, # Path to the generated aur.json
-        upstream_versions_json_path: Path # Path where nvchecker will write its results
+        potential_workspace_packages: List[PotentialPackage], # CHANGED
+        aur_json_path: Path,
+        upstream_versions_json_path: Path # Target for newver if used by nvchecker itself
     ) -> Path:
-        """
-        Aggregates all individual .nvchecker.toml files from workspace_packages
-        into a single global configuration file (new.toml) for nvchecker.
-        File is created in config.nvchecker_run_dir.
-        """
         global_config_path = self.config.nvchecker_run_dir / "new.toml"
         logger.info(f"Preparing global nvchecker configuration at: {global_config_path}")
 
         config_content = f"[__config__]\n"
         config_content += f"oldver = \"{aur_json_path.resolve()}\"\n"
-        # nvchecker will write its findings here if using this newver mechanism
+        # If nvchecker --logger json is parsed directly, newver in config isn't strictly for output.
+        # It could be a conceptual path or not set if direct parsing is used.
+        # For now, keep it as it's common practice for nvchecker file setups.
         config_content += f"newver = \"{upstream_versions_json_path.resolve()}\"\n\n"
 
-
         aggregated_count = 0
-        for pkg_data in workspace_packages:
-            if pkg_data.nvchecker_config_path_relative:
-                # Resolve relative path from workspace root
-                abs_nvchecker_path = (self.config.github_workspace / pkg_data.nvchecker_config_path_relative).resolve()
+        for pot_pkg in potential_workspace_packages: # CHANGED
+            if pot_pkg.nvchecker_config_path_relative:
+                abs_nvchecker_path = (self.config.github_workspace / pot_pkg.nvchecker_config_path_relative).resolve()
                 if abs_nvchecker_path.is_file():
                     try:
-                        logger.debug(f"Appending content from: {abs_nvchecker_path} for {pkg_data.display_name}")
-                        config_content += f"# --- Config for {pkg_data.display_name} from {pkg_data.nvchecker_config_path_relative} ---\n"
+                        pkg_display_name = pot_pkg.pkgbuild_path.parent.name # Use parent dir name as temp display
+                        logger.debug(f"Appending content from: {abs_nvchecker_path} for potential pkg in {pkg_display_name}")
+                        config_content += f"# --- Config for {pkg_display_name} from {pot_pkg.nvchecker_config_path_relative} ---\n"
                         config_content += abs_nvchecker_path.read_text()
                         config_content += "\n\n"
                         aggregated_count += 1
                     except IOError as e:
-                        logger.warning(f"Could not read .nvchecker.toml for {pkg_data.display_name} at {abs_nvchecker_path}: {e}")
+                        logger.warning(f"Could not read .nvchecker.toml for {pkg_display_name} at {abs_nvchecker_path}: {e}")
                 else:
                     logger.warning(f".nvchecker.toml for {pkg_data.display_name} not found at resolved path: {abs_nvchecker_path}")
             else:

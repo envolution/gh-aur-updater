@@ -21,6 +21,7 @@ from .exceptions import ArchPackageUpdaterError # Assuming exceptions.py exists
 # --- Workflow Components ---
 from .workspace_scanner import scan_workspace_pkgbuilds
 from .aur_client import fetch_maintained_packages
+from .pkgbuild_parser import parse_pkgbuild_srcinfo
 from .nvchecker_client import NvCheckerClient
 from .github_client import GitHubClient
 from .package_updater import PackageUpdater
@@ -117,46 +118,102 @@ def run_main_workflow(config: BuildConfiguration):
     gh_client = GitHubClient(config, run_subprocess) # gh_client checks auth in its init
     updater = PackageUpdater(config, nv_client, gh_client, run_subprocess)
 
-    # --- Phase 1: Information Gathering ---
-    logger.info("--- Phase 1: Gathering Package Information ---")
+    # --- Phase 1: AUR State & Global Upstream Check ---
+    logger.info("--- Phase 1: Gathering AUR State & Scanning Workspace for nvchecker configs ---")
     
-    workspace_pkgs: List[PKGBUILDData] = scan_workspace_pkgbuilds(config)
-    if not workspace_pkgs:
-        logger.warning("No PKGBUILDs successfully parsed from the workspace. Cannot proceed with update checks.")
-        logger.info("Workflow finished: No PKGBUILDs to process.")
+    potential_pkgs_in_workspace: List[PotentialPackage] = find_potential_packages(config) # From workspace_scanner
+    if not potential_pkgs_in_workspace:
+        logger.warning("No potential packages (PKGBUILDs with optional .nvchecker.toml) found. Exiting.")
         return
-    
-    workspace_pkgs_map: Dict[str, PKGBUILDData] = {pkg.pkgbase: pkg for pkg in workspace_pkgs}
-    logger.info(f"Found and parsed {len(workspace_pkgs)} PKGBUILDs from workspace.")
 
     aur_maintained_pkgs: List[AURPackageInfo] = fetch_maintained_packages(config.aur_maintainer_name)
     aur_pkgs_map: Dict[str, AURPackageInfo] = {pkg.pkgbase: pkg for pkg in aur_maintained_pkgs}
-    logger.info(f"Found {len(aur_maintained_pkgs)} packages maintained by '{config.aur_maintainer_name}' on AUR.")
+    logger.info(f"Found {len(aur_maintained_pkgs)} packages for '{config.aur_maintainer_name}' on AUR.")
 
-    # --- Phase 2: Global Update Detection (nvchecker) ---
-    logger.info("--- Phase 2: Detecting Global Upstream Updates ---")
-    
     aur_snapshot_path = nv_client.generate_aur_snapshot_json(aur_maintained_pkgs)
-    
-    # Define where nvchecker's global run will write its "newver" file
-    # This file isn't strictly needed if we parse nvchecker's JSON stream directly,
-    # but nvchecker config schema expects a `newver` path.
-    global_upstream_versions_path = config.nvchecker_run_dir / "upstream_versions.json"
+    global_upstream_versions_path = config.nvchecker_run_dir / "upstream_versions.json" # Conceptual target
     
     global_nv_config_path = nv_client.prepare_global_nvchecker_config(
-        workspace_pkgs, aur_snapshot_path, global_upstream_versions_path
+        potential_pkgs_in_workspace, # Pass List[PotentialPackage]
+        aur_snapshot_path,
+        global_upstream_versions_path
     )
-    keyfile_path = nv_client.generate_keyfile() # Uses config.secret_ghuk_value
+    keyfile_path = nv_client.generate_keyfile()
 
-    globally_updated_versions: Dict[str, str] = nv_client.run_global_check_and_get_updates(
+    globally_updated_versions_map: Dict[str, str] = nv_client.run_global_check_and_get_updates(
         global_nv_config_path, keyfile_path
     )
 
-    if not globally_updated_versions:
-        logger.info("No packages found with upstream updates compared to AUR during global check.")
-        logger.info("Workflow finished: No updates to process.")
+    if not globally_updated_versions_map:
+        logger.info("Global nvchecker: No packages found with upstream updates compared to AUR.")
         return
-    logger.info(f"Global check identified {len(globally_updated_versions)} package(s) with potential updates: {list(globally_updated_versions.keys())}")
+    logger.info(f"Global nvchecker: Identified {len(globally_updated_versions_map)} package(s) with upstream updates: {list(globally_updated_versions_map.keys())}")
+
+    # --- Phase 2: Task Creation & Detailed Parsing (Only for updated packages) ---
+    logger.info("--- Phase 2: Creating Update Tasks & Parsing Specific PKGBUILDs ---")
+    tasks_to_process: List[PackageUpdateTask] = []
+
+    # Need a way to map pkgbase from nvchecker output back to its PotentialPackage/PKGBUILD path
+    # This assumes pkgbase from nvchecker matches the directory name or a pkgbase var in PKGBUILD.
+    # A robust way: iterate potential_pkgs_in_workspace, if its .nvchecker.toml outputted a pkg_name
+    # that is in globally_updated_versions_map, then parse it.
+    # For now, assume keys in globally_updated_versions_map are pkgbases we can find a PKGBUILD for.
+
+    # Create a map of pkgbuild_path by assumed pkgbase (e.g., parent directory name)
+    # This is a simplification; a more robust mapping might be needed if dir name != pkgbase
+    pkgbuild_paths_by_pkgbase: Dict[str, Path] = {
+        pp.pkgbuild_path.parent.name: pp.pkgbuild_path for pp in potential_pkgs_in_workspace
+    }
+
+
+    for pkgbase_to_update, new_upstream_ver_str in globally_updated_versions_map.items():
+        logger.info(f"Processing '{pkgbase_to_update}' identified for update to '{new_upstream_ver_str}'.")
+        
+        pkgbuild_file_to_parse = pkgbuild_paths_by_pkgbase.get(pkgbase_to_update)
+        if not pkgbuild_file_to_parse:
+            logger.warning(f"Found update for '{pkgbase_to_update}', but could not find its PKGBUILD path. Skipping.")
+            continue
+
+        logger.info(f"Parsing PKGBUILD for '{pkgbase_to_update}' at: {pkgbuild_file_to_parse}")
+        # Pass config for builder_home_dir if parse_pkgbuild_srcinfo needs it for permissions
+        # Assuming parse_pkgbuild_srcinfo can get builder_home from config if necessary
+        # or that the current user has makepkg rights.
+        # For the permissions issue, you might pass config.builder_user_home to parse_pkgbuild_srcinfo
+        # which would then be used if makepkg is run via sudo -u builder HOME=...
+        pkg_data: Optional[PKGBUILDData] = parse_pkgbuild_srcinfo(
+            pkgbuild_file_to_parse,
+            # builder_home_dir=config.builder_user_home_if_defined # Example
+        )
+
+        if not pkg_data:
+            logger.error(f"Failed to parse PKGBUILD for '{pkgbase_to_update}'. Skipping task creation.")
+            continue
+        
+        # Quick check if parsed pkgbase matches expected pkgbase
+        if pkg_data.pkgbase != pkgbase_to_update:
+            logger.warning(f"Parsed pkgbase '{pkg_data.pkgbase}' for {pkgbuild_file_to_parse.parent.name} "
+                           f"does not match expected '{pkgbase_to_update}' from nvchecker. Using parsed: '{pkg_data.pkgbase}'.")
+            # This might indicate an issue with how nvchecker keys map to PKGBUILDs.
+            # For now, we trust the parsed pkg_data.pkgbase for the task.
+
+        aur_info = aur_pkgs_map.get(pkg_data.pkgbase) # Use parsed pkgbase
+
+        # Additional check: Is the new upstream version really newer than AUR?
+        # (nvchecker global check should've done this, but a re-check is fine)
+        if aur_info and PkgVersion.from_string(new_upstream_ver_str).pkgver == aur_info.version_obj.pkgver:
+            # This comparison is basic; a proper version object comparison is better.
+            # For simplicity, if pkgvers match, assume it might not need an update unless forced.
+            logger.info(f"Package '{pkg_data.pkgbase}' target upstream version '{new_upstream_ver_str}' "
+                        f"matches current AUR pkgver '{aur_info.version_obj.pkgver}'. "
+                        "Task will still be created; PackageUpdater will make final decision.")
+
+        task = PackageUpdateTask(
+            pkgbuild_data=pkg_data,
+            aur_info=aur_info,
+            target_upstream_ver_str=new_upstream_ver_str
+        )
+        tasks_to_process.append(task)
+        logger.info(f"Created task for '{pkg_data.display_name}' to target version '{new_upstream_ver_str}'.")
 
     # --- Phase 3: Task Creation ---
     logger.info("--- Phase 3: Creating Update Tasks ---")

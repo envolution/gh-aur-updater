@@ -13,7 +13,11 @@ class BuildConfiguration:
     """Overall configuration for the build process, loaded from environment."""
     github_repository: str          # e.g., "owner/repo"
     github_token: str
+
     github_workspace: Path
+    pkgbuild_search_root: Path      # NEW: The root directory for PKGBUILD searches
+    pkgbuild_search_patterns: List[str] = field(default_factory=lambda: ["**/PKGBUILD"])
+
     github_run_id: str
     github_actor: str               # User who triggered the workflow
 
@@ -32,6 +36,7 @@ class BuildConfiguration:
     debug_mode: bool
     dry_run_mode: bool              # If True, no actual changes (git push, releases) are made
     secret_ghuk_value: Optional[str] = None # For nvchecker keyfile.toml
+
 
 # --- Package Information Models ---
 
