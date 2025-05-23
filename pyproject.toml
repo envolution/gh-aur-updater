@@ -91,4 +91,4 @@ warn_return_any = true
 warn_unused_configs = true
 
 [project.scripts]
-arch-pkg-updater = "gh-aur-updater.main:main_cli_entry_function"
+gh-aur-updater = "gh-aur-updater.main:main_cli_entry_function"
