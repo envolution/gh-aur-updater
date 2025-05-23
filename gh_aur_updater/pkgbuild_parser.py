@@ -79,7 +79,7 @@ def parse_pkgbuild_srcinfo(
     pkgbuild_dir = pkgbuild_file_path.parent
     logger.debug(f"Generating .SRCINFO for: {pkgbuild_file_path}")
 
-    command = ["makepkg", "--printsrcinfo", "--nocolor"]
+    command = ["sudo", "-u", "builder", "makepkg", "--printsrcinfo", "--nocolor"]
     env_vars = os.environ.copy() # Inherit current environment
     if builder_home_dir:
         env_vars["HOME"] = str(builder_home_dir)
