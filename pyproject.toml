@@ -1,0 +1,94 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"] # Added wheel, good practice
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gh-aur-updater"
+version = "0.1.0" # You can update this as you develop
+description = "A Python application to automate Arch Linux package updates, building, and publishing."
+readme = "README.md" # Optional: if you have a README.md
+authors = [
+    { name = "envolution / Maintainer", email = "your_email@example.com" },
+]
+license = { text = "MIT License" } # Or your chosen license
+classifiers = [
+    "Development Status :: 3 - Alpha", # Or 4 - Beta, 5 - Production/Stable
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: System :: Archiving :: Packaging",
+    "License :: OSI Approved :: MIT License", # Match your license
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12", # Specify compatible Python versions
+    "Programming Language :: Python :: 3.13", # Specify compatible Python versions
+]
+keywords = ["archlinux", "aur", "package", "automation", "ci"] # Keywords for discoverability
+
+# Your project's main dependencies
+dependencies = [
+    "requests",          # For HTTP requests (e.g., AUR client)
+    "python-dotenv",     # For loading .env files during local development
+]
+
+[project.urls] # Optional: Links related to your project
+"Homepage" = "https://github.com/your_username/gh-aur-updater" # Example
+"Bug Tracker" = "https://github.com/your_username/gh-aur-updater/issues" # Example
+
+[project.optional-dependencies]
+# Dependencies needed for running tests
+test = [
+    "pytest>=7.0",         # Testing framework
+    "pytest-mock>=3.0",    # For mocking (often comes with pytest or via unittest.mock)
+    "responses>=0.20",     # For mocking HTTP requests (used in test_aur_client.py)
+    "pytest-cov",        # For test coverage reports (optional)
+]
+# Dependencies for development (e.g., linters, formatters)
+dev = [
+    "arch-package-updater[test]", # Includes test dependencies
+    "black",                # Code formatter
+    "ruff",                 # Linter
+    "mypy",                 # Static type checker
+]
+
+[tool.setuptools]
+# This tells setuptools where to find your package(s)
+# For a simple layout where your package `gh-aur-updater` is a directory
+# directly under the project root, this is usually sufficient.
+packages = ["gh-aur-updater"]
+# If you have a `src` layout (e.g., `src/gh-aur-updater`), you'd adjust this:
+# [tool.setuptools.packages.find]
+# where = ["src"]
+# include = ["gh-aur-updater*"]
+
+[tool.pytest.ini_options]
+# minversion = "6.0" # Optional: specify minimum pytest version
+addopts = "-ra -q --color=yes" # Recommended options: report all but pass, quiet, color
+testpaths = [ # Where to find tests
+    "tests",
+]
+python_files = "test_*.py" # Pattern for test files
+python_classes = "Test*"    # Pattern for test classes
+python_functions = "test_*"  # Pattern for test functions
+
+[tool.black]
+line-length = 88 # Or your preferred line length
+target-version = ['py39', 'py310', 'py311', 'py312'] # Python versions to target for compatibility
+
+[tool.ruff]
+line-length = 88
+# Select a base set of rules, e.g., pycodestyle (E) and Pyflakes (F)
+# You can find more rule codes here: https://beta.ruff.rs/docs/rules/
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM"]
+ignore = [] # Specific rules to ignore, e.g., ["E501"] if you handle line length differently elsewhere
+
+[tool.mypy]
+python_version = "3.9" # Or your minimum supported Python version
+warn_return_any = true
+warn_unused_configs = true
+
+[project.scripts]
+arch-pkg-updater = "gh-aur-updater.main:main_cli_entry_function"
