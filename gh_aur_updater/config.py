@@ -99,7 +99,7 @@ def load_configuration() -> BuildConfiguration:
         commit_message_prefix=_get_env_var("COMMIT_MESSAGE_PREFIX", "CI: Auto update"),
         debug_mode=_to_bool(_get_env_var("DEBUG_MODE", "false")),
         dry_run_mode=_to_bool(_get_env_var("DRY_RUN_MODE", "false")),
-        secret_ghuk_value=_get_env_var("SECRET_GHUK_VALUE") # Optional
+        secret_ghuk_value=_get_env_var("SECRET_GHUK_VALUE"), # Optional
         pkgbuild_search_root=pkgbuild_search_root_actual,
         pkgbuild_search_patterns=pkgbuild_patterns if pkgbuild_patterns else default_patterns # Ensure it's never None
     )
