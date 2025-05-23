@@ -58,11 +58,7 @@ dev = [
 # This tells setuptools where to find your package(s)
 # For a simple layout where your package `gh-aur-updater` is a directory
 # directly under the project root, this is usually sufficient.
-packages = ["gh-aur-updater"]
-# If you have a `src` layout (e.g., `src/gh-aur-updater`), you'd adjust this:
-# [tool.setuptools.packages.find]
-# where = ["src"]
-# include = ["gh-aur-updater*"]
+packages = ["gh_aur_updater"]
 
 [tool.pytest.ini_options]
 # minversion = "6.0" # Optional: specify minimum pytest version
