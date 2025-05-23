@@ -2,6 +2,8 @@
 import logging
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
+from dataclasses import dataclass, field
+
 
 from .models import BuildConfiguration # Only need BuildConfiguration here
 
