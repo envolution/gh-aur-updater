@@ -15,8 +15,6 @@ class BuildConfiguration:
     github_token: str
 
     github_workspace: Path
-    pkgbuild_search_root: Path      # NEW: The root directory for PKGBUILD searches
-    pkgbuild_search_patterns: List[str] = field(default_factory=lambda: ["**/PKGBUILD"])
 
     github_run_id: str
     github_actor: str               # User who triggered the workflow
@@ -37,6 +35,8 @@ class BuildConfiguration:
     dry_run_mode: bool              # If True, no actual changes (git push, releases) are made
     secret_ghuk_value: Optional[str] = None # For nvchecker keyfile.toml
 
+    pkgbuild_search_root: Path      # NEW: The root directory for PKGBUILD searches
+    pkgbuild_search_patterns: List[str] = field(default_factory=lambda: ["**/PKGBUILD"])
 
 # --- Package Information Models ---
 
