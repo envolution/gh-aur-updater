@@ -19,7 +19,7 @@ from .utils import run_subprocess # Assuming run_subprocess is in utils.py
 from .exceptions import ArchPackageUpdaterError # Assuming exceptions.py exists
 
 # --- Workflow Components ---
-from .workspace_scanner import scan_workspace_pkgbuilds
+from .workspace_scanner import find_potential_packages
 from .aur_client import fetch_maintained_packages
 from .pkgbuild_parser import parse_pkgbuild_srcinfo
 from .nvchecker_client import NvCheckerClient
